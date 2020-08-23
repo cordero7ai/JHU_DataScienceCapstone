@@ -226,7 +226,7 @@ Notice how the maximum number of words in a line in the twitter file was only 26
 
 ### Cleaning Up the Data
 
-We form the Corpus and remove all unnecessary features from Data. We also sample the Data in order to have a faster analisis, however we may as well include all contents with all lines for the analysis. We also apply a censorship function in order to remove all bad words, punctuations or other features we decided irrelvant for this project. The list of obscene words was taken from the repository [https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en](https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en).
+We form the Corpus and remove all unnecessary features from Data. We also sample the Data in order to have a faster analisis, however we may as well include all contents with all lines for the analysis. We also apply a censorship function in order to remove all bad words, punctuations or other features we decided irrelevant for this project. The list of obscene words was taken from the repository [https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en](https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en).
 
 The following function make it possible:
 
@@ -266,7 +266,7 @@ cleanCorpus <- function(rawCorpus) {
 
 ### Word Frequency
 
-We consider the top 25 words that we found over a sampled subset of the original Data from merging the three datasets. We set a variable to extract only a percentage of lines from the original file (trying to practice a sampling task, however we may as well consider all data for exploratory analisis since no performance issues are critical in this case). We then show a plot containing the frequencies of most used words.
+We consider the top 25 words that we found over a sampled subset of the original Data from merging the three datasets. We set a variable to extract only a percentage of lines from the original file (trying to practice a sampling task, however we may as well consider all data for exploratory analysis since no performance issues are critical in this case). We then show a plot containing the frequencies of most used words.
 
 ```{r wordfreq}
 suppressMessages( library(ggplot2))

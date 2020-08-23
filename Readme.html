@@ -374,6 +374,7 @@ summary {
 <h2>Johns Hopkins University</h2>
 <p>This repository contains all code and products that are necessary to build a predictive application for natural language processing. We will demonstrate the application of several data science tasks to a dataset from the SwiftKey company. We include all scripts that were used to obtain, pre-process, analize and make predictions from the Data.</p>
 <p>Please refer to all R scripts in the webpage <a href="https://github.com/corderoai/JHU_DataScienceCapstone">https://github.com/corderoai/JHU_DataScienceCapstone</a>.</p>
+<p>The Milestone Report is available at: <a href="https://rpubs.com/jcoml/648976">https://rpubs.com/jcoml/648976</a></p>
 </div>
 </div>
 <div id="journal-of-tasks" class="section level1">
@@ -791,9 +792,1251 @@ getCoverage &lt;- function(theCorpus, percentage){
 <ol start="5" style="list-style-type: decimal">
 <li>Can you think of a way to increase the coverage – identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?</li>
 </ol>
-<p>We may use another machine learning method to learn the vocabulary and habits of the user in order to offer a more personalized prediction and thus, increasing coverage. The coverage of other spatio temporal features such as location: We may also use location services in order to recommend nearby places or other features that might be of interest. Finally, we may learn the relationship between stopwords and other nouns and verbs that might be correlated.</p>
-<p>Please refer to the <code>exploratoryAnalisis.R</code> script.</p>
+<p>We may use another machine learning method to learn the vocabulary and habits of the user in order to offer a more personalized prediction, and thus, increasing coverage. The coverage of other spatio temporal features such as location: We may also use location services in order to recommend nearby places or other features that might be of interest. Finally, we may learn the relationship between stopwords and other nouns and verbs that might be correlated.</p>
+<p>Please refer to the <code>exploratoryAnalisis.R</code> script in this repo.</p>
 </div>
+</div>
+<div id="task-3---modeling" class="section level2">
+<h2>Task 3 - Modeling</h2>
+<p>The goal here is to build your first simple model for the relationship between words. This is the first step in building a predictive text mining application. You will explore simple models and discover more complicated modeling techniques.</p>
+<div id="tasks-to-accomplish" class="section level3">
+<h3>Tasks to accomplish</h3>
+<p><strong>A. Build basic n-gram model - using the exploratory analysis you performed, build a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words.</strong></p>
+<p>There are three major steps in building the n-gram model.</p>
+<ol style="list-style-type: decimal">
+<li><p>Loading and sampling the Data.</p></li>
+<li><p>Extracting the n-grams from the sampled Data and the entered word(s).</p></li>
+<li><p>Making predictions of the words in the last level of a given n-gram by taking the <code>n-1</code> n-gram as the pivot.</p></li>
+</ol>
+<p>We assume that the entered sentence has at most 3 words. However, for cases where we encounter longer sentences we decided to take into consideration only the last 3 words. We believe those ending words correspond to better predictors of the fourth word, although further linguistic argumentation is needed.</p>
+<p>We assume that the best prediction is given by the most restrictive combination of entered words. The largest n-gram of entered words narrows down the number of possibilities for predicted words. Thus, we should aim to predict the following token by taking advantage of this feature.</p>
+<p>The algorithm accepts the word(s), then tokenizes the sentence into lexems. We aim to predict the next word by firstly taking into consideration the largest n-gram, then the (n-1)-gram down to the (n-2)-gram. For each case we match the entered n-gram with those ones that were extracted from the Corpus. We select and output the top 3 words with the most frequencies. At the end, we return a list of at most 3 top word suggestions for each n-gram case. Therefore, an entered n-gram will obtain a n sized list of lists of top frequency suggestions.</p>
+<p>Lower ranked n-grams (2-grams, unigrams) also obtain their suggestions in the same fashion. In the case that no n-gram was matched against the mined tokens a string “@@@” is returned. That delimiter lexem can help us to signal other procedures to make suggestions based in unobserved n-grams in the Corpus. As a simple example: The trigram “I will live” will be tokenized and matched against the extracted Corpus n-grams and a possible list of suggestion would look like “((x3_1, x3_2, x3_3), (y2_1, y2_2, y2_3), (z1_1, z1_2, z1_3))”, in this case x3_1 is the suggested “first” top word (with highest frequency from the trigram in the corpus) from the trigram “I will live”“. x3_3 is the third top word suggestion by using the trigram as the predictor. y2_2 is the second top word suggestion from the bigram”I will“. y2_1 is the top word suggestion for the same bigram. z1_3 is the third top suggestion (third highest frequency in corpus) from the unigram”I&quot;.</p>
+<p>In the case that lower level n-grams are entered the same procedure applies.</p>
+<p>An entered n-gram that does not match some or all of its sub (n-k)grams against the Corpus receives a prediction of a special token “@@@” for that specific unobserved (n-k)gram. For example the entered words “Her name” matched the unigram “name” at least three times in the Corpus but did not match the “her-name” bigram. In this case the algorithm will suggest the following list of lists: ((“@@@”), (x1_1, x1_2, x1_3)).</p>
+<pre><code>## Converts numeric named vector into customized n-gram dataframe
+convertNNVtoDF &lt;- function(ngramNumVector, n){
+  
+  df &lt;- stack(ngramNumVector)
+  df &lt;- setNames(df[2:1], c(&#39;Words&#39;,&#39;Frequency&#39;))
+  df$Words &lt;- as.character(df$Words)
+  
+  if(n == 2){
+    df$Prediction &lt;- gsub(&quot;^.*_&quot;, &quot;&quot;, df$Words)
+    df$Predictor &lt;- gsub(&quot;_.*&quot;, &quot;&quot;, df$Words)
+  }
+  else if(n == 3){
+    df$Prediction &lt;- gsub(&quot;^.*_&quot;, &quot;&quot;, df$Words)
+    df$Predictor2Gram &lt;- gsub(&quot;_([^_]*)$&quot;, &quot;&quot;, df$Words)
+    df$Predictor1Gram &lt;- gsub(&quot;^.*_&quot;, &quot;&quot;, df$Predictor2Gram)
+  }  
+  else if(n == 4){
+    df$Prediction &lt;- gsub(&quot;^.*_&quot;, &quot;&quot;, df$Words)
+    df$Predictor3Gram &lt;- gsub(&quot;_([^_]*)$&quot;, &quot;&quot;, df$Words)
+    df$Predictor2Gram &lt;- gsub(&quot;^.+?(_)&quot;, &quot;&quot;, df$Predictor3Gram)
+    df$Predictor1Gram &lt;- gsub(&quot;^.*_&quot;, &quot;&quot;, df$Predictor2Gram)
+  }
+  print(head(df))
+  
+  return(df)
+}
+
+## Builds a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words.
+  #returns a list of dataframe words from 3-previous_words, 2-previous_words, 1-previous_word.
+    #the dataframe contains at most the top 3 most frequent words used after the n-1 n-gram from OFFLINE Data.
+      #If the input word(s) do(es) not match any previous n-1 n-gram, then the suggested element word will be @@@
+predictNextWordWithObservedNGrams &lt;- function(enteredWords, bigramsDf, trigramsDf, tetragramsDf){
+  
+  nextWordList &lt;- vector(mode = &quot;list&quot;, length = 3)
+  
+  if(nchar(enteredWords) &gt; 0 ){
+    
+    ## 1.Format the entered word into homogeneous tokens 
+    enteredWords &lt;- gsub(&quot;_&quot;, &quot;&quot;, enteredWords)
+    queryTokens &lt;- tokenizeAndcleanCorpus(enteredWords)
+    
+    ## 2. Trim the entered word(s). 
+      #We will predict words by taking at most trigrams. If longer sentences are entered then we start building up n-grams
+      #from the end of the sentence and then expanding to previous (n-2) adjacent tokens.
+      #We divide the entered words in (n-k)grams from the nth token to the first. 
+      #Example: &quot;Apple wins&quot;. unigram: &quot;wins&quot;, bigram: &quot;apple-wins&quot;
+    
+    queryLength &lt;- ntoken(queryTokens)[[1]][1]
+      
+    #Go for initital trigrams:
+    if( queryLength &gt;= 3){
+      predictorNGram &lt;- paste(tail(queryTokens[[1]], 3), collapse = &quot;_&quot;)
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM tetragramsDf
+                                  WHERE Predictor3Gram = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+                        )
+      if(nrow(resultSet) == 0){ nextWordList[[1]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[1]] &lt;- as.list(resultSet$Prediction) }
+      
+      #Go for bigrams
+      predictorNGram &lt;- paste(tail(queryTokens[[1]], 2), collapse = &quot;_&quot;)
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM trigramsDf
+                                  WHERE Predictor2Gram = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+      )
+      if(nrow(resultSet) == 0){ nextWordList[[2]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[2]] &lt;- as.list(resultSet$Prediction) }
+      
+      #Go for unigrams
+      predictorNGram &lt;- paste(tail(queryTokens[[1]], 1))
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM bigramsDf
+                                  WHERE Predictor = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+      ) 
+      if(nrow(resultSet) == 0){ nextWordList[[3]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[3]] &lt;- as.list(resultSet$Prediction) }
+    }
+    #Go for initial bigrams:
+    else if( queryLength == 2){
+      nextWordList[[1]] &lt;- &quot;@@@&quot;
+      predictorNGram &lt;- paste(tail(queryTokens[[1]], 2), collapse = &quot;_&quot;)
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM trigramsDf
+                                  WHERE Predictor2Gram = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+      )
+      if(nrow(resultSet) == 0){ nextWordList[[2]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[2]] &lt;- as.list(resultSet$Prediction) }
+      
+      #Go for unigrams
+      predictorNGram &lt;- paste(tail(queryTokens[[1]], 1))
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM bigramsDf
+                                  WHERE Predictor = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+      )
+      if(nrow(resultSet) == 0){ nextWordList[[3]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[3]] &lt;- as.list(resultSet$Prediction) }
+    }
+    #Go for initial unigrams:
+    else if( queryLength == 1){
+      nextWordList[[1]] &lt;- &quot;@@@&quot;
+      nextWordList[[2]] &lt;- &quot;@@@&quot;
+      predictorNGram &lt;- tail(queryTokens[[1]], 1)
+      resultSet &lt;- sqldf(sprintf(&quot;SELECT Prediction 
+                                  FROM bigramsDf
+                                  WHERE Predictor = &#39;%s&#39; 
+                                  ORDER BY Frequency DESC
+                                  LIMIT 3&quot;
+                                 , predictorNGram)
+      ) 
+      if(nrow(resultSet) == 0){ nextWordList[[3]] &lt;- &quot;@@@&quot;  }
+      else{ nextWordList[[3]] &lt;- as.list(resultSet$Prediction) }
+    }
+    else{
+      nextWordList &lt;- list(&quot;@@@&quot;,&quot;@@@&quot;,&quot;@@@&quot;)
+    }
+  }
+  else{
+    nextWordList &lt;- list(&quot;@@@&quot;,&quot;@@@&quot;,&quot;@@@&quot;)
+  }
+  
+  print(queryTokens)
+  print(nextWordList)
+  
+  return(nextWordList)
+}
+
+suppressMessages(library(quanteda))
+  suppressMessages(library(sqldf))
+  suppressMessages(source(&quot;readData.R&quot;))
+  options(warn=-1)
+  
+  ### 1. Load and Sample the Data:
+  start_time &lt;- Sys.time()
+  
+  fullDataUSTwitter &lt;- readFullFile(&quot;./data/final/en_US/en_US.twitter.txt&quot;)
+  fullDataUSBlogs &lt;- readFullFile(&quot;./data/final/en_US/en_US.blogs.txt&quot;)
+  fullDataUSNews &lt;- readFullFile(&quot;./data/final/en_US/en_US.news.txt&quot;)
+  
+  set.seed(13)
+  sampleSizePercentage &lt;- .01     
+  sampledDataUSTwitter &lt;- sample(fullDataUSTwitter, round(sampleSizePercentage*length(fullDataUSTwitter)), replace = F)
+  sampledDataUSBlogs &lt;- sample(fullDataUSBlogs, round(sampleSizePercentage*length(fullDataUSBlogs)), replace = F)
+  sampledDataUSNews &lt;- sample(fullDataUSNews, round(sampleSizePercentage*length(fullDataUSNews)), replace = F) 
+  sampledDataTwitterBlogsNews &lt;- c(sampledDataUSTwitter, sampledDataUSBlogs, sampledDataUSNews)
+  
+  textData &lt;- sampledDataTwitterBlogsNews
+      #print(textData)
+  end_time &lt;- Sys.time()
+  elapsed_time &lt;- difftime(end_time, start_time, unit = &quot;secs&quot;)
+  displaySummaryOfTextVectorInConsole( textData, sampleSizePercentage, elapsed_time )
+  
+  ### 2. TOKENIZE and Clean the Corpus or Character Vector.
+  start_time &lt;- Sys.time()
+  
+  textTokens &lt;- tokenizeAndcleanCorpus(textData)
+  
+  end_time &lt;- Sys.time()
+  getElapsedTimeMessage(&quot;TOKENIZE. Offline&quot;, start_time, end_time)
+  
+  ### 3. Compute n-grams. OFFLINE
+  start_time &lt;- Sys.time()
+  
+    #Obtain tokens data structures.
+  unigrams &lt;- tokens_ngrams(textTokens, n = 1)
+  bigrams &lt;- tokens_ngrams(textTokens, n = 2)
+  trigrams &lt;- tokens_ngrams(textTokens, n = 3)
+  tetragrams &lt;- tokens_ngrams(textTokens, n = 4)
+  
+    #Obtain dfms with frequencies.
+  unigrams.dfm &lt;- dfm(unigrams)
+  bigrams.dfm &lt;- dfm(bigrams)
+  trigrams.dfm &lt;- dfm(trigrams)
+  tetragrams.dfm &lt;- dfm(tetragrams)
+  
+    #Obtain SORTED Frequency vector of n-grams.
+  unigrams.numVector &lt;- topfeatures(unigrams.dfm, nfeat(unigrams.dfm))
+  bigrams.numVector &lt;- topfeatures(bigrams.dfm, nfeat(bigrams.dfm))
+  trigrams.numVector &lt;- topfeatures(trigrams.dfm, nfeat(trigrams.dfm))
+  tetragrams.numVector &lt;- topfeatures(tetragrams.dfm, nfeat(tetragrams.dfm))
+  
+    #Obtain data.frames with frequencies.
+  unigrams.df &lt;- convertNNVtoDF(unigrams.numVector, 1)
+  bigrams.df &lt;- convertNNVtoDF(bigrams.numVector, 2)
+  trigrams.df &lt;- convertNNVtoDF(trigrams.numVector, 3)
+  tetragrams.df &lt;- convertNNVtoDF(tetragrams.numVector, 4)
+  
+  end_time &lt;- Sys.time()
+  getElapsedTimeMessage(&quot;Computing n-grams. OFFLINE&quot;, start_time, end_time)
+  
+    #SAVE the data frames of unigrams, bigrams, trigrams, tetragrams here!
+    #DO NOT RUN 1. 2. 3. again if you already computed the dataframes! USE the STORED dfs
+    save(list = c(&quot;unigrams.df&quot;, &quot;bigrams.df&quot;, &quot;trigrams.df&quot;, &quot;tetragrams.df&quot;), file = &quot;./data/ngrams.df.Rdata&quot;,
+         compress = FALSE)
+    
+  ### 4. A) Make predictions using ONLY observed n-grams. ONLINE
+  
+    # LOAD the ngrams data frames! Faster, do not calculate them again!  
+    #load(&quot;./data/ngrams.df.RData&quot;,  verbose = TRUE)
+  start_time &lt;- Sys.time()  
+  
+  predictNextWordWithObservedNGrams( &quot;right&quot;, bigrams.df, trigrams.df, tetragrams.df) 
+
+  end_time &lt;- Sys.time()
+  getElapsedTimeMessage(&quot;Predicting with Simplest Model Observed ngrams&quot;, start_time, end_time)
+
+</code></pre>
+<p><strong>B. Build a model to handle unseen n-grams - in some cases people will want to type a combination of words that does not appear in the corpora. Build a model to handle cases where a particular n-gram isn’t observed.</strong></p>
+<p>The previous algorithm is based only in counts. We may need to normalize it to convert the frequencies into probabilities. A good reference for constructing n-gram predictor models can be found at <a href="https://www.cs.cornell.edu/courses/cs4740/2012sp/lectures/smoothing+backoff-1-4pp.pdf">https://www.cs.cornell.edu/courses/cs4740/2012sp/lectures/smoothing+backoff-1-4pp.pdf</a>.</p>
+<p>Before we proceed to elaborate a more professional algorithm. We need to decide how much Data are we going to cover. The longer the sample size the higher the frequencies will get for more n-grams. Furthermore, a large amount of unigrams might be covered. It would be interesting to concentrate on setting different sample sizes and choose the smallest number of words that covers the highest amount of the Corpus. However, we will concentrate on 3 sample sizes and we will evaluate all algorithms in these datasets.</p>
+<p>We define the parameter <code>Omega</code> to be the actual sample size in which the experiments will be carried out. We will construct three datasets with <code>Omega = 0.1%, 0.5%, 1%,</code> and <code>3%</code> of all Data in the Corpus.</p>
+<p>In order to select different dataset sample instances we use the following code (in the processNGrams.R script):</p>
+<pre><code>processNGrams &lt;- function(){
+  suppressMessages(source(&quot;readData.R&quot;))
+  options(warn=-1)
+  
+  set.seed(13)
+  sampleSizePercentage &lt;- c(0.001, 0.005, 0.01) 
+  
+  for(i in 1:length(sampleSizePercentage)){
+    ### 1. Load and Sample the Data:
+    start_time &lt;- Sys.time()
+  
+    fullDataUSTwitter &lt;- readFullFile(&quot;./data/final/en_US/en_US.twitter.txt&quot;)
+    fullDataUSBlogs &lt;- readFullFile(&quot;./data/final/en_US/en_US.blogs.txt&quot;)
+    fullDataUSNews &lt;- readFullFile(&quot;./data/final/en_US/en_US.news.txt&quot;)
+    sampledDataUSTwitter &lt;- sample(fullDataUSTwitter, round(sampleSizePercentage[i]*length(fullDataUSTwitter)), replace = F)
+    sampledDataUSBlogs &lt;- sample(fullDataUSBlogs, round(sampleSizePercentage[i]*length(fullDataUSBlogs)), replace = F)
+    sampledDataUSNews &lt;- sample(fullDataUSNews, round(sampleSizePercentage[i]*length(fullDataUSNews)), replace = F) 
+    sampledDataTwitterBlogsNews &lt;- c(sampledDataUSTwitter, sampledDataUSBlogs, sampledDataUSNews)
+    textData &lt;- sampledDataTwitterBlogsNews
+    #print(textData)
+    end_time &lt;- Sys.time()
+    elapsed_time &lt;- difftime(end_time, start_time, unit = &quot;secs&quot;)
+    displaySummaryOfTextVectorInConsole( textData, sampleSizePercentage, elapsed_time )
+    
+    ### 2. TOKENIZE and Clean the Corpus or Character Vector.
+    start_time &lt;- Sys.time()
+    
+    textTokens &lt;- tokenizeAndcleanCorpus(textData)
+    
+    end_time &lt;- Sys.time()
+    getElapsedTimeMessage(&quot;TOKENIZE. Offline&quot;, start_time, end_time)
+    
+    ### 3. Compute n-grams. OFFLINE
+    start_time &lt;- Sys.time()
+    
+    #Obtain tokens data structures.
+    unigrams &lt;- tokens_ngrams(textTokens, n = 1)
+    bigrams &lt;- tokens_ngrams(textTokens, n = 2)
+    trigrams &lt;- tokens_ngrams(textTokens, n = 3)
+    tetragrams &lt;- tokens_ngrams(textTokens, n = 4)
+    
+    #Obtain dfms with frequencies.
+    unigrams.dfm &lt;- dfm(unigrams)
+    bigrams.dfm &lt;- dfm(bigrams)
+    trigrams.dfm &lt;- dfm(trigrams)
+    tetragrams.dfm &lt;- dfm(tetragrams)
+    
+    #Obtain SORTED Frequency vector of n-grams.
+    unigrams.numVector &lt;- topfeatures(unigrams.dfm, nfeat(unigrams.dfm))
+    bigrams.numVector &lt;- topfeatures(bigrams.dfm, nfeat(bigrams.dfm))
+    trigrams.numVector &lt;- topfeatures(trigrams.dfm, nfeat(trigrams.dfm))
+    tetragrams.numVector &lt;- topfeatures(tetragrams.dfm, nfeat(tetragrams.dfm))
+    
+    #Obtain data.frames with frequencies.n-grams and probabilities.
+    unigrams.df &lt;- convertNNVtoDF(unigrams.numVector, 1)
+    bigrams.df &lt;- convertNNVtoDF(bigrams.numVector, 2)
+    trigrams.df &lt;- convertNNVtoDF(trigrams.numVector, 3)
+    tetragrams.df &lt;- convertNNVtoDF(tetragrams.numVector, 4)
+    
+    save(list = c(&quot;unigrams.df&quot;, &quot;bigrams.df&quot;, &quot;trigrams.df&quot;, &quot;tetragrams.df&quot;), 
+         file = paste0(&quot;./data/ngrams.df.f.&quot;, sampleSizePercentage[i], &quot;.Rdata&quot;),
+         compress = FALSE)
+    
+    #Compute Probabilities for all n-gram dataframes
+    unigrams.df &lt;- computeProbabilityAndSaveDf(unigrams.df, 1, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+    bigrams.df &lt;- computeProbabilityAndSaveDf(bigrams.df, 2, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+    trigrams.df &lt;- computeProbabilityAndSaveDf(trigrams.df, 3, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+    tetragrams.df &lt;- computeProbabilityAndSaveDf(tetragrams.df, 4, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+    
+    save(list = c(&quot;unigrams.df&quot;, &quot;bigrams.df&quot;, &quot;trigrams.df&quot;, &quot;tetragrams.df&quot;), 
+         file = paste0(&quot;./data/ngrams.df.p.&quot;, sampleSizePercentage[i], &quot;.Rdata&quot;),
+         compress = FALSE)
+    
+    end_time &lt;- Sys.time()
+    getElapsedTimeMessage(&quot;Computing n-grams. OFFLINE&quot;, start_time, end_time)
+  }
+  
+  return(sampleSizePercentage)
+}</code></pre>
+<p>As stated in page 3 of <a href="https://web.stanford.edu/~jurafsky/slp3/3.pdf">https://web.stanford.edu/~jurafsky/slp3/3.pdf</a>: “we can not just estimate by counting the number of times every word occurs following every long string, because language is creative and any particular context might have never occurred before!” This Assumption is the core to devise a better way for predicting words given a particular set of n-grams. The frequency counts do not help us to estimate the probabilities of unseen words without making more assumptions.</p>
+<p>In order to predict words that were not previously observed in the Corpus we follow the next algorithm:</p>
+<p><strong>Historical Track Algorithm (HT)</strong></p>
+<p>-Assume a given Word w_{j+1} is more likely to appear if and only if its likelihood is maximum when accompained with words w_{1}^{j-1} that preceeded it (have been previously observed).</p>
+<ol style="list-style-type: lower-alpha">
+<li>Receive vector of predictions, if vector is empty or it has less than three suggestions:</li>
+</ol>
+<p>a.1. Loop for the number of remaining predictions and predict the word w_{j+1} given the sequence w_{1}^{j}:</p>
+<pre><code>a.1.1. Using the chain rule we reduce the joint probability distribution P(w_{n},w_{1}^{n-1}) = P(w_{1})P(w_{2}|w_{1})P(w_{3}|w_{1}^{2})...P(w_{n}|w_{1}^{n-1}). Furthermore, we apply the bigram model to compact even more the joint chained probability distribution into bigram sequences: P(w_{n},w_{1}^{n-1}) = P(w_{1})P(w_{2}|w_{1})...P(w_{n}|w_{n-1}).  
+
+a.1.2. Look for the bigrams that partially match w_{1}^{j}.
+
+a.1.3. Obtain the probabilities for those matched sequences according to the chain rule.
+
+a.1.4. For the factors in the chain rule that involve the unobserved words in the prediction (variable on the left part of the conditional distribution): Substitute that probability with an uniform distribution (acccording to the total number of bigrams). If the unobserved word matches the predictor (conditional right part) then naively set the probability P(w_{j+1}|w_{j}) = P(w_{j+1}).</code></pre>
+<p>a.2. Obtain the w_{j+1} to be predicted by choosing the bigrams with highest Probability from the previously computed set.</p>
+<p>a.3. In case that no word was found in the unigrams then choose a random word with uniform distribution from the top 25 most frequen words.</p>
+<p>a.4. Add that word to the prediction vector.</p>
+<ol start="2" style="list-style-type: lower-alpha">
+<li>Return the prediction vector.</li>
+</ol>
+</div>
+<div id="relevant-performance-debuggers" class="section level3">
+<h3>Relevant Performance Debuggers:</h3>
+<p><code>object.size()</code>: this function reports the number of bytes that an R object occupies in memory</p>
+<p><code>Rprof()</code>: this function runs the profiler in R that can be used to determine where bottlenecks in your function may exist. The profr package (available on CRAN) provides some additional tools for visualizing and summarizing profiling data.</p>
+<p><code>gc()</code>: this function runs the garbage collector to retrieve unused RAM for R. In the process it tells you how much memory is currently being used by R.</p>
+<p>Questions considered:</p>
+<p><strong>1. How can you efficiently store an n-gram model (think Markov Chains)?</strong></p>
+<p>Markov Chains follow the basic principle: The future is independent of the past given the present. Specifically according to <a href="https://en.wikipedia.org/wiki/Markov_chain">1</a> it is a sequence of possible events in which the probability of each event depends only on the state attained in the previous event.</p>
+<p>In the case of this application, we may use a markov chains as the modeling tool to encapsulate the syntax of sentences. Markov chains can be thought as a way to define a state transition model (a graph whose nodes are words or states and edges or transitions are the connections to other states or words).</p>
+<p>It is extremely easy to visualize how we can translate n-grams to a markov chain. Each initial word A in an n-gram represents a given state in the chain and then, given the possible following words B we can calculate a probability of transitioning from A to B. In other words, A can transition to N possible B words. We just need to count the frequencies of transitioning from A to a given Bx word and dividing it by the total number of transition frequencies in Data.</p>
+<p>In order to predict a word we need at least a 2-gram (since an input word works as a pivot or root node).</p>
+<p>An ngram is efficiently represented as a tree structure, where an initial word is the root and the subsequent words represent transitions to words in branches and leafs. Levels in the three are the levels in the n-grams. In terms of memory this may be expensive but in time complexity very fast (lineal time because n words can only transition to another set of m words independently of previous ones). We will initially consider those transitions that have been observed from Data sequences in sentences.</p>
+<p><strong>First Outline:</strong></p>
+<p>We can start by calculating unigrams, bigrams, etc. From a sample size as big as possible (in an offline manner). A prediction algorithm will be trainned with these Data.</p>
+<p>Then, once the application is loaded, we wait until a given word(s) is entered <code>W</code>. The entered word or words are matched against the previously calculated n-grams with a level as long as the number of words in the text.</p>
+<p>Finally the prediction algorithm will recommend the top <code>beta</code> words that have the highest frequencies in the final level in the n-gram.</p>
+<p><strong>2. How can you use the knowledge about word frequencies to make your model smaller and more efficient?</strong></p>
+<p>The algorithm is composed of two phases an offline and online modules. We can take advantage of previously computed n-grams to reduce the search space at the time of suggesting a new word in an online manner.Thus, we will be performing searches in a data structure of n-grams.</p>
+<p><strong>3. How many parameters do you need (i.e. how big is n in your n-gram model)?</strong></p>
+<p>Whenever we detect a new word <code>W</code> we proceed to search for its n-grams in the data structure.</p>
+<p>We need a parameter <code>ng</code> to define the number of n-grams to be retieved. We may need another paramenter <code>lng</code> to define the size of the top n-grams to be searched online that were not observed in the Data.</p>
+<p><strong>4. Can you think of simple ways to “smooth” the probabilities (think about giving all n-grams a non-zero probability even if they aren’t observed in the data) ?</strong></p>
+<p>By reducing the sample size of the top <code>ng</code> n-grams we may assign a uniform distribution to those most <code>lng</code> n-grams that were not observed.</p>
+<p><strong>5. How do you evaluate whether your model is any good?</strong></p>
+<p>By dividing the Data in training, validation and test sets. We compute residual errors over predicted words of the final level in the n-grams.</p>
+<p>We expect to gain more accuracy by increasing the sample size.</p>
+<p><strong>6. How can you use backoff models to estimate the probability of unobserved n-grams?</strong></p>
+<p>The approach mentioned above assigns an uniform distribution to those top <code>lng</code> n-grams that have not been fully observed. However we may explore those words that end up in the final <code>n-1</code> n-gram level with the highest frequencies. If this is not possible we go back to <code>n-2</code> n-grams and repeat the same steps. Finally, we may end up with the unigrams with the highest frequencies in the Data.</p>
+<p>A smart way would be to also perform online-learning over the history of sentences entered by the user and use that as another Data source to calculate n-grams.</p>
+<p>For the case of unigrams any speculative algorithm or other sources of Data can be used. However, this search is likely to be heuristic.</p>
+<p>Please refer to the <code>learning.R</code> script for more details.</p>
+<p><strong>Note About Processing Input words:</strong></p>
+<p>Before we elaborate more on the algorithms we process the entered text and tokenize it with the following function:</p>
+<pre><code>#Receives a vector of characters and outputs a dataframe with its processed tokens.
+cleanInputNGram &lt;- function(inputNGram){
+  
+  inputNGram &lt;- gsub(&quot;_&quot;, &quot;&quot;, inputNGram)
+  queryTokens &lt;- tokenizeAndcleanCorpus(enteredWords)
+  n &lt;- as.numeric(ntoken(queryTokens[[1]][1]))
+  predictorTokens &lt;- tail(queryTokens[[1]], 3)
+  predictorNGram &lt;- paste(tail(queryTokens[[1]], 3), collapse = &quot;_&quot;)
+  df &lt;- data.frame(Words = predictorNGram, size = n)
+  df$word1 &lt;- as.character(predictorTokens[3])
+  
+  if(n == 2){
+    df$word2 &lt;- as.character(predictorTokens[2])
+  }
+  else if(n &gt;= 3){
+    df$word2 &lt;- as.character(predictorTokens[2])
+    df$word3 &lt;- as.character(predictorTokens[1])
+  }
+  
+  return( df )
+}</code></pre>
+<p>##Task 4 - Prediction Model</p>
+<p>The goal of this exercise is to build and evaluate your first predictive model. You will use the n-gram and backoff models you built in previous tasks to build and evaluate your predictive model. The goal is to make the model efficient and accurate.</p>
+<p>###Tasks to accomplish</p>
+<p>Build a predictive model based on the previous data modeling steps - you may combine the models in any way you think is appropriate.</p>
+<p><strong>Note: Please refer to the <code>nGramPredictionV1.R</code> script for details of the functions to be mentioned below.</strong></p>
+<ol style="list-style-type: decimal">
+<li>Evaluate the model for efficiency and accuracy - use timing software to evaluate the computational complexity of your model.</li>
+</ol>
+<ol style="list-style-type: lower-alpha">
+<li>We load the full data into memory (which is about 556 MBs), clean the Data by using the <code>quanteda</code> package (removing punctuation, special characters, bad words, etc.) and tokenize all lexems. Then, we find the unigrams, bigrams, trigrams and tetragrams. For clarity, portability and speed of execution we store those n-grams into a <code>.RData</code> file as dataframes along with its respective frequencies and probabilities (e.g. Probability(word_2 | word_1) = Counts(word_1_word_2)/Counts(word_1)).</li>
+</ol>
+<p>For simplicity, the algorithms use all these n-grams in the datagrams. The portability of this approach is very important, we only access the full data once per sample size experiment. The idea is to load this data in the server side of a shiny app, this way we do not need to sample or access the full Data whenever the user enters the app.</p>
+<ol start="2" style="list-style-type: lower-alpha">
+<li><strong>Space Complexity:</strong> The datagrams for a given sample size are stored in a single file. This file has information related to the frequencies and probabilities. In specific terms the space complexity is linear <code>O(k*S*M)</code> where <code>k</code> is the constant number of columns for the dataframes, <code>M</code> is the full size of the Corpus and <code>0&lt;s&lt;1</code> is the sample size. The following table presents a summary of the different obtained files:</li>
+</ol>
+<table>
+<colgroup>
+<col width="11%"></col>
+<col width="17%"></col>
+<col width="17%"></col>
+<col width="17%"></col>
+<col width="17%"></col>
+<col width="17%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th>Sample Size</th>
+<th>Size in MegaBytes</th>
+<th># of unigrams</th>
+<th># of bigrams</th>
+<th># of trigrams</th>
+<th># of tetragrams</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>.1%</td>
+<td>11 MB</td>
+<td>11,333</td>
+<td>31, 895</td>
+<td>30,208</td>
+<td>27,320</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>52 MB</td>
+<td>30,327</td>
+<td>149,946</td>
+<td>150,685</td>
+<td>136,596</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>104 MB</td>
+<td>45,557</td>
+<td>288,100</td>
+<td>303,569</td>
+<td>276,178</td>
+</tr>
+<tr class="even">
+<td>3%</td>
+<td>297 MB</td>
+<td>85,275</td>
+<td>776,006</td>
+<td>894,046</td>
+<td>818,433</td>
+</tr>
+</tbody>
+</table>
+<p>c <strong>Time Complexity:</strong> The idea of using a reduced sample size and a dataframe set structure simplifies computations significatively. The time complexity is in the worst case scenario is in the order of <code>O(r*c)</code> where <code>r</code> is the maximum number of rows in a dataframe and <code>c</code> is the maximum length of a given n-gram.</p>
+<ul>
+<li>In order to measure elapsed times we use the following functions:</li>
+</ul>
+<pre><code>start_time &lt;- Sys.time()
+
+### CODE TO BE TESTED
+
+end_time &lt;- Sys.time()
+  getElapsedTimeMessage(&quot;PREDICTION. ONLINE&quot;, start_time, end_time)
+  
+getElapsedTimeMessage &lt;- function(message, st, et){
+  print(&quot;**************************************************************&quot;)
+  print(paste(&quot;Elapsed Time in Seconds for:&quot;, message, difftime(et, st, unit = &quot;secs&quot;) ))
+  print(&quot;**************************************************************&quot;)
+  print(&quot;*&quot;)
+}  </code></pre>
+<ul>
+<li>The amount of time required to load the Data accross different table sizes and query time (predicting a word given an initial entered sentence) is shown in the following table:</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th>Sample Size</th>
+<th>Time to Load Full Data into Memory</th>
+<th>Time per Single Query</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>.1%</td>
+<td>4.5 seconds</td>
+<td>0.041 seconds</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>4.7 seconds</td>
+<td>0.049 seconds</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>5.01 seconds</td>
+<td>0.053 seconds</td>
+</tr>
+<tr class="even">
+<td>3%</td>
+<td>5.07 seconds</td>
+<td>0.085 seconds</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note that “Time to Load Full Data into Memory” is run only once when the user enters the shiny app. The contents of the n-grams are stored into the server’s memory.</strong></p>
+<ol start="2" style="list-style-type: decimal">
+<li>Evaluate the model accuracy using different metrics like perplexity, accuracy at the first word, second word, and third word.</li>
+</ol>
+<p>According to <a href="https://www.cs.cornell.edu/courses/cs4740/2012sp/lectures/smoothing+backoff-1-4pp.pdf">https://www.cs.cornell.edu/courses/cs4740/2012sp/lectures/smoothing+backoff-1-4pp.pdf</a> there are two major ways we can test a n-gram prediction algorithm: By using extrinsic or intrinsic evaluations. Extrinsic evaluation requires to test for specific accuracies over inputed sentences. Intrinsic evaluation uses specific polinomial formulae such as perplexity.</p>
+<ol style="list-style-type: lower-alpha">
+<li><strong>Perplexity:</strong> The intuition behind this metric is that “the best language model is the one that best predicts an unseen test set”. A reference to this metric is found at <a href="https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3">https://towardsdatascience.com/perplexity-intuition-and-derivation-105dd481c8f3</a>.</li>
+</ol>
+<p>Perplexity is the inverse probability of the test set, normalized by the number of words:</p>
+<pre><code>PP(W) = P(w1, w2, ..., wN)^(-1/N)</code></pre>
+<p>where N is the n-gram level n and the joint probability distribution is decomposed by the chain rule:</p>
+<pre><code>P(w1, w2, ..., wN) = P(w1)P(W2|w1), ..., P(wn|w_{1}^{n-1})
+
+P(W2|w1) = COUNTS(w1_w2) / COUNTS(w1)
+P(wn|w_{1}^{n-1}) = COUNTS(w1_w2,...,_wn-1_wn)/COUNTS((w1_w2,...,_wn-1)</code></pre>
+<p>for cases when the probability is zero (unobserved) we set an extremely low probability 1*10-7 to avoid divisions by zero.</p>
+<p><strong>We can see that minimizing perplexity is equivalent to maximizing probability <a href="https://web.stanford.edu/class/cs124/">https://web.stanford.edu/class/cs124/</a>.</strong></p>
+<p>For performing this computation we need to modify the original nGramPredictionV1 function to incluse in a list of lists the predicted words but also their decomposed probabilities <code>P(w1)P(w2|w1)...P(wn|w1w2...wn-1)</code>.</p>
+<ol start="2" style="list-style-type: lower-alpha">
+<li><strong>Accuracy of Predictions:</strong> We prepare a test set in which we will hide the last lexem of the sentence, this last word would be our “true” prediction <code>Y</code>. We will use the (n-1) test n-grams and stored the predicted words by the model <code>h</code>. We just average the amount of accurate answers <code>Y == h</code> for any n-gram by the total amount of test instances <code>t</code>.</li>
+</ol>
+<pre><code>Accuracy_N = (1/t)*(Number_Of_Ys==hs)</code></pre>
+<p>###Questions to consider</p>
+<ol style="list-style-type: decimal">
+<li>How does the model perform for different choices of the parameters and size of the model?</li>
+</ol>
+<p><strong>For our case the model do not have internal parameters. We consider to run the experiments by choosing the exact match algorithm, the back off completion algorithm and the history track algorithm by separate and combined for all sample sizes.</strong></p>
+<ol start="2" style="list-style-type: decimal">
+<li>How much does the model slow down for the performance you gain?</li>
+</ol>
+<p><strong>The best performance is achieved when the sample size is larger, thus we need to take into consideration the amount of time it takes to predict words for a single query.</strong></p>
+<ol start="3" style="list-style-type: decimal">
+<li>Does perplexity correlate with the other measures of accuracy?</li>
+</ol>
+<p><strong>Indeed, they are the inverse.</strong></p>
+<ol start="4" style="list-style-type: decimal">
+<li>Can you reduce the size of the model (number of parameters) without reducing performance?</li>
+</ol>
+<p><strong>The best try would be to use the smallest sample size to train the model.</strong></p>
+</div>
+<div id="natural-language-processing-i-check" class="section level3">
+<h3>Natural language processing I Check</h3>
+<ol style="list-style-type: decimal">
+<li>For each of the sentence fragments below use your natural language processing algorithm to predict the next word in the sentence.</li>
+</ol>
+<p>The guy in front of me just bought a pound of bacon, a bouquet, and a case of</p>
+<p><strong>beer</strong></p>
+<ol start="2" style="list-style-type: decimal">
+<li>You’re the reason why I smile everyday. Can you follow me please? It would mean the</li>
+</ol>
+<p><strong>world</strong></p>
+<ol start="3" style="list-style-type: decimal">
+<li>Hey sunshine, can you follow me and make me the</li>
+</ol>
+<p><strong>happiest</strong></p>
+<ol start="4" style="list-style-type: decimal">
+<li>Very early observations on the Bills game: Offense still struggling but the</li>
+</ol>
+<p><strong>defence</strong></p>
+<ol start="5" style="list-style-type: decimal">
+<li>Go on a romantic date at the</li>
+</ol>
+<p><strong>beach</strong></p>
+<ol start="6" style="list-style-type: decimal">
+<li>Well I’m pretty sure my granny has some old bagpipes in her garage I’ll dust them off and be on my</li>
+</ol>
+<p><strong>way</strong></p>
+<ol start="7" style="list-style-type: decimal">
+<li>Ohhhhh #PointBreak is on tomorrow. Love that film and haven’t seen it in quite some</li>
+</ol>
+<p><strong>time</strong></p>
+<ol start="8" style="list-style-type: decimal">
+<li>After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little</li>
+</ol>
+<p><strong>fingers</strong></p>
+<ol start="9" style="list-style-type: decimal">
+<li>Be grateful for the good times and keep the faith during the</li>
+</ol>
+<p><strong>bad</strong></p>
+<ol start="10" style="list-style-type: decimal">
+<li>If this isn’t the cutest thing you’ve ever seen, then you must be</li>
+</ol>
+<p><strong>insane</strong></p>
+</div>
+</div>
+<div id="task-5---creative-exploration" class="section level2">
+<h2>Task 5 - Creative Exploration</h2>
+<p>So far you have used basic models to understand and predict words. In this next task, your goal is to use all the resources you have available to you (from the Data Science Specialization, resources on the web, or your own creativity) to improve the predictive accuracy while reducing computational runtime and model complexity (if you can). Be sure to hold out a test set to evaluate the new, more creative models you are building.</p>
+<p>Tasks to accomplish</p>
+<div id="explore-new-models-and-data-to-improve-your-predictive-model." class="section level3">
+<h3>1. Explore new models and data to improve your predictive model.</h3>
+<p>We tested different sample sizes and different seeds to construct the training set.</p>
+</div>
+<div id="evaluate-your-new-predictions-on-both-accuracy-and-efficiency." class="section level3">
+<h3>2. Evaluate your new predictions on both accuracy and efficiency.</h3>
+<p>We will present the final results in next section.</p>
+<p>Questions to consider</p>
+<p><strong>1. What are some alternative data sets you could consider using?</strong></p>
+<p>Collecting a dataset of tweets available at different repositories for NLP.</p>
+<p><strong>2. What are ways in which the n-gram model may be inefficient?</strong></p>
+<p>Whenever the test cases contain words that were skipped in the cleaning phase.</p>
+<p><strong>3. What are the most commonly missed n-grams? Can you think of a reason why they would be missed and fix that?</strong></p>
+<p>All connecting words. They are missing because of the highly restrictive cleaning process.</p>
+<p><strong>4. What are some other things that other people have tried to improve their model?</strong></p>
+<p>Try to reduce perplexity by training the model with a larger sample size or a bootstrapped partition.</p>
+<p><strong>5. Can you estimate how uncertain you are about the words you are predicting?</strong></p>
+<p>We can try to measure entropy over the joint probability distribution of the predicted n-gram.</p>
+</div>
+</div>
+<div id="experimental-results." class="section level2">
+<h2>Experimental Results.</h2>
+<p>We conducted a series of experiments to test the accuracy of predicting words given any sentence. Specifically, we tried to include sentences including unigrams, bigrams and trigrams (or any other 3&gt;gram). We take a given n-gram and remove the last word, this last word is thus compared with the prediction given by the algorithm by using the (n-1)gram.</p>
+<p>The amount of test cases is presented in the following table:</p>
+<table>
+<thead>
+<tr class="header">
+<th>n-gram</th>
+<th># of test cases</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>bigrams</td>
+<td>3708</td>
+</tr>
+<tr class="even">
+<td>trigrams</td>
+<td>3435</td>
+</tr>
+<tr class="odd">
+<td>tetragrams</td>
+<td>3148</td>
+</tr>
+</tbody>
+</table>
+<p>Then, we selected the trainned models corresponding to different amounts of sample sizes (.1%, .5%, 1% and 3%). We understand by trainned models the posterior probabilities that were computed after estimating the counts of observed n-grams.</p>
+<p>Our general algorithm do not contain continuos parameters but discrete sub algorithms. We ran experiments to test the exact matches algorithm (EMS) that matches input words with observed training n-grams and the historical track algorithm (HT).</p>
+<p>In the case of the EMS, we concluded that given the extremely small sample size used to train the algorithms it is very likely that we will not observe the majority of the input test n-grams. Therefore, we decided to include in the EMS the subalgorithm which uses the back-off models (predicting from previos (n-k) starting by the end of the sentence), e.g. the sequente “happy new” (input bigram) will be matched with the two words but also we will look for recommendations for the “new” (input unigram).</p>
+<p>For each input sentence we tokenize it and convert it to an n-gram W. We compute the accuracy with an indicator function 1a. We input 1 to the result of the experimental test case if the predicted word is identical to the held out word in the input. We add a 0 if the predicted and initial n-grams differ. We then report the average result by summing up the number of accurate results (1’s) and dividing by the total number of test cases for a given n-gram level.</p>
+<p>The results for each n-gram tupple is presented in the following table:</p>
+<div id="accuracy" class="section level3">
+<h3>Accuracy</h3>
+<table>
+<colgroup>
+<col width="13%"></col>
+<col width="9%"></col>
+<col width="25%"></col>
+<col width="24%"></col>
+<col width="27%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th>Sample Size</th>
+<th>n-gram</th>
+<th>Accuracy using only EMS(%)</th>
+<th>Accuracy using only HT(%)</th>
+<th>Accuracy using EMS and HT(%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>.1%</td>
+<td>bigrams</td>
+<td>25.64</td>
+<td>13.32</td>
+<td>28.44</td>
+</tr>
+<tr class="even">
+<td>.1%</td>
+<td>trigrams</td>
+<td>26.16</td>
+<td>24.36</td>
+<td>26.52</td>
+</tr>
+<tr class="odd">
+<td>.1%</td>
+<td>tetragrams</td>
+<td>24.72</td>
+<td>24.32</td>
+<td>25.08</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>bigrams</td>
+<td>44.84</td>
+<td>13.31</td>
+<td>47.16</td>
+</tr>
+<tr class="odd">
+<td>.5%</td>
+<td>trigrams</td>
+<td>44.28</td>
+<td>16.32</td>
+<td>46.08</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>tetragrams</td>
+<td>41.60</td>
+<td>38.52</td>
+<td>42.61</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>bigrams</td>
+<td>55.87</td>
+<td>14.88</td>
+<td>60.12</td>
+</tr>
+<tr class="even">
+<td>1%</td>
+<td>trigrams</td>
+<td>55.01</td>
+<td>7.22</td>
+<td>72.60</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>tetragrams</td>
+<td>54.93</td>
+<td>4.92</td>
+<td>71.64</td>
+</tr>
+<tr class="even">
+<td>3%</td>
+<td>bigrams</td>
+<td>60.28</td>
+<td>9.36</td>
+<td>72.12</td>
+</tr>
+<tr class="odd">
+<td>3%</td>
+<td>trigrams</td>
+<td>61.99</td>
+<td>3.57</td>
+<td>81.36</td>
+</tr>
+<tr class="even">
+<td>3%</td>
+<td>tetragrams</td>
+<td>60.28</td>
+<td>3.82</td>
+<td>80.04</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="perplexity-results" class="section level3">
+<h3>Perplexity Results</h3>
+<p>We measure the perplexity for the posterior probabilities computed by the training Data that match the unseen text. We decomposed the Data into the same four sample sizes and computed the mean perplexity for all test cases. The following table shows the results:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Sample Size</th>
+<th>n-gram</th>
+<th>Accuracy</th>
+<th>mean(Perplexity)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>.1%</td>
+<td>bigrams</td>
+<td>28.44</td>
+<td>19,407.643</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>bigrams</td>
+<td>47.16</td>
+<td>10,926.306</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>bigrams</td>
+<td>60.12</td>
+<td>8,829.629</td>
+</tr>
+<tr class="even">
+<td><strong>3%</strong></td>
+<td><strong>bigrams</strong></td>
+<td><strong>72.12</strong></td>
+<td><strong>7,053.359</strong></td>
+</tr>
+<tr class="odd">
+<td>.1%</td>
+<td>trigrams</td>
+<td>26.52</td>
+<td>22,929.987</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>trigrams</td>
+<td>46.08</td>
+<td>15,065.242</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>trigrams</td>
+<td>72.60</td>
+<td>13,094.427</td>
+</tr>
+<tr class="even">
+<td><strong>3%</strong></td>
+<td><strong>trigrams</strong></td>
+<td><strong>81.36</strong></td>
+<td><strong>11,244.204</strong></td>
+</tr>
+<tr class="odd">
+<td>.1%</td>
+<td>tetragrams</td>
+<td>25.08</td>
+<td>27,110.892</td>
+</tr>
+<tr class="even">
+<td>.5%</td>
+<td>tetragrams</td>
+<td>42.61</td>
+<td>19,839.251</td>
+</tr>
+<tr class="odd">
+<td>1%</td>
+<td>tetragrams</td>
+<td>71.64</td>
+<td>17,637.174</td>
+</tr>
+<tr class="even">
+<td><strong>3%</strong></td>
+<td><strong>tetragrams</strong></td>
+<td><strong>80.04</strong></td>
+<td><strong>15,753.426</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The results clearly indicate a trend, whenever we observe a decrease in perplexity we naturally observe an increase in accuracy.</strong> The general approach used to compute the perplexity is given by the following code:</p>
+<pre><code>experimentPerplexity &lt;- function( sampleSizePercentage ){
+  suppressMessages(source(&quot;nGramPredictionV1.R&quot;))
+  suppressMessages(source(&quot;readData.R&quot;))
+  options(warn=-1)
+  
+  perplexity.bigrams.df &lt;- data.frame(w1w2 = character(), 
+                                   w1 = character(), 
+                                   p.w2gw1 = numeric(),
+                                   p.w1 = numeric(),
+                                   perplexity = numeric())
+  
+  perplexity.trigrams.df &lt;- data.frame(w1w2w3 = character(), 
+                                       w1w2 = character(),
+                                       w1 = character(),
+                                       p.w3gw1w2 = numeric(),
+                                       p.w2gw1 = numeric(),
+                                       p.w1 = numeric(),
+                                       perplexity = numeric()
+                                       )
+  perplexity.tetragrams.df &lt;- data.frame(w1w2w3w4 = character(), 
+                                         w1w2w3 = character(),
+                                         w1w2 = character(),
+                                         w1 = character(),
+                                         p.w4gw1w2w3 = numeric(),
+                                         p.w3gw1w2 = numeric(),
+                                         p.w2gw1 = numeric(),
+                                         p.w1 = numeric(),
+                                         perplexity = numeric()
+                                         )
+  
+  #Load test cases
+  load(&quot;./data/ngrams.df.testcases.1e-04.Rdata&quot;,  verbose = TRUE)
+  
+  #Load trainned Model Parameters
+  load(paste0(&quot;./data/ngrams.df.p.&quot;, sampleSizePercentage, &quot;.Rdata&quot;),  verbose = TRUE)
+  
+  for(ng in 2:4){
+    if(ng == 2){
+      for(i in 1:nrow(test.bigrams.df)){
+        
+        Probw2givenw1 &lt;- bigrams.df[bigrams.df[&quot;Words&quot;] == test.bigrams.df$Words[i], &quot;Probability&quot;]
+        if( length(Probw2givenw1) == 0 ||  Probw2givenw1 == 0) { Probw2givenw1 &lt;- 0.0000001 }
+        
+        Probw1 &lt;- unigrams.df[unigrams.df[&quot;Words&quot;] == test.bigrams.df$word1[i], &quot;Probability&quot;]
+        if( length(Probw1) == 0 ||  Probw1 == 0) { Probw1 &lt;- 0.0000001 }
+        
+        perplexityBigram &lt;- computePerplexityBigram(Probw2givenw1, Probw1)
+        
+        df &lt;- data.frame(w1w2 = test.bigrams.df$Words[i], 
+                         w1 = test.bigrams.df$word1[i], 
+                         p.w2gw1 = Probw2givenw1,
+                         p.w1 = Probw1,
+                         perplexity = perplexityBigram
+                         )
+        
+        print(paste(&quot;TEST CASE: &quot;, i))
+        print(df)
+        
+        #Store test case result.  
+        perplexity.bigrams.df &lt;- rbind(perplexity.bigrams.df, df)
+      }
+    }
+    else if(ng == 3){
+      for(i in 1:nrow(test.trigrams.df)){
+        word1.word2.word3 &lt;- test.trigrams.df$Words[i]
+        word1.word2 &lt;- paste(test.trigrams.df$word1[i], test.trigrams.df$word2[i], sep = &quot;_&quot;)
+        word1 &lt;- test.trigrams.df$word1[i]
+        
+        Probw3givenw1w2 &lt;- trigrams.df[trigrams.df[&quot;Words&quot;] == word1.word2.word3, &quot;Probability&quot;]
+        if( length(Probw3givenw1w2) == 0 ||  Probw3givenw1w2 == 0) { Probw3givenw1w2 &lt;- 0.0000001 }
+        
+        Probw2givenw1 &lt;- bigrams.df[bigrams.df[&quot;Words&quot;] == word1.word2, &quot;Probability&quot;]
+        if( length(Probw2givenw1) == 0 ||  Probw2givenw1 == 0) { Probw2givenw1 &lt;- 0.0000001 }
+        
+        Probw1 &lt;- unigrams.df[unigrams.df[&quot;Words&quot;] ==  word1, &quot;Probability&quot;]
+        if( length(Probw1) == 0 ||  Probw1 == 0) { Probw1 &lt;- 0.0000001 }
+        
+        perplexityTrigram &lt;- computePerplexityTrigram(Probw3givenw1w2, Probw2givenw1, Probw1)
+        
+        df &lt;- data.frame(w1w2w3 = word1.word2.word3, 
+                         w1w2 = word1.word2,
+                         w1 = word1,
+                         p.w3gw1w2 = Probw3givenw1w2,
+                         p.w2gw1 = Probw2givenw1,
+                         p.w1 = Probw1,
+                         perplexity = perplexityTrigram
+                        )
+        
+        print(paste(&quot;TEST CASE: &quot;, i))
+        print(df)
+        
+        #Store test case result.  
+        perplexity.trigrams.df &lt;- rbind(perplexity.trigrams.df, df)
+      }
+    }
+    else if(ng == 4){
+      for(i in 1:nrow(test.tetragrams.df)){
+        word1.word2.word3.word4 &lt;- test.tetragrams.df$Words[i]
+        word1.word2.word3 &lt;- paste(test.tetragrams.df$word1[i], test.tetragrams.df$word2[i], test.tetragrams.df$word3[i], sep = &quot;_&quot;)
+        word1.word2 &lt;- paste(test.tetragrams.df$word1[i], test.tetragrams.df$word2[i], sep = &quot;_&quot;)
+        word1 &lt;- test.tetragrams.df$word1[i]
+        
+        Probw4givenw1w2w3 &lt;- tetragrams.df[tetragrams.df[&quot;Words&quot;] == word1.word2.word3.word4, &quot;Probability&quot;]
+        if( length(Probw4givenw1w2w3) == 0 ||  Probw4givenw1w2w3 == 0) { Probw4givenw1w2w3 &lt;- 0.0000001 }
+        
+        Probw3givenw1w2 &lt;- trigrams.df[trigrams.df[&quot;Words&quot;] == word1.word2.word3, &quot;Probability&quot;]
+        if( length(Probw3givenw1w2) == 0 ||  Probw3givenw1w2 == 0) { Probw3givenw1w2 &lt;- 0.0000001 }
+        
+        Probw2givenw1 &lt;- bigrams.df[bigrams.df[&quot;Words&quot;] == word1.word2, &quot;Probability&quot;]
+        if( length(Probw2givenw1) == 0 ||  Probw2givenw1 == 0) { Probw2givenw1 &lt;- 0.0000001 }
+        
+        Probw1 &lt;- unigrams.df[unigrams.df[&quot;Words&quot;] ==  word1, &quot;Probability&quot;]
+        if( length(Probw1) == 0 ||  Probw1 == 0) { Probw1 &lt;- 0.0000001 }
+        
+        perplexityTetragram &lt;- computePerplexityTetragram(Probw4givenw1w2w3, Probw3givenw1w2, Probw2givenw1, Probw1)
+        
+        df &lt;- data.frame(w1w2w3w4 = word1.word2.word3.word4, 
+                         w1w2w3 = word1.word2.word3,
+                         w1w2 = word1.word2,
+                         w1 = word1,
+                         p.w4gw1w2w3 = Probw4givenw1w2w3,
+                         p.w3gw1w2 = Probw3givenw1w2,
+                         p.w2gw1 = Probw2givenw1,
+                         p.w1 = Probw1,
+                         perplexity = perplexityTetragram
+                         )
+        print(paste(&quot;TEST CASE: &quot;, i))
+        print(df)
+        
+        #Store test case result.  
+        perplexity.tetragrams.df &lt;- rbind(perplexity.tetragrams.df, df)
+      }
+    }
+  }
+  
+  print(paste(&quot;Bigram Perplexity for Sample size:&quot;, sampleSizePercentage))
+  print(paste(&quot;Bigram test cases:&quot;, nrow(perplexity.bigrams.df)))
+  print(paste(&quot;Bigram test Perplexity:&quot;, mean(perplexity.bigrams.df$perplexity)))
+  
+  print(paste(&quot;Trigram Perplexity for Sample size:&quot;, sampleSizePercentage))
+  print(paste(&quot;Trigram test cases:&quot;, nrow(perplexity.trigrams.df)))
+  print(paste(&quot;Trigram test Perplexity:&quot;, mean(perplexity.trigrams.df$perplexity)))
+  
+  print(paste(&quot;Tetragram Perplexity for Sample size:&quot;, sampleSizePercentage))
+  print(paste(&quot;Tetragram test cases:&quot;, nrow(perplexity.tetragrams.df)))
+  print(paste(&quot;Tetragram test Perplexity:&quot;, mean(perplexity.tetragrams.df$perplexity)))
+}
+
+computePerplexityBigram &lt;- function(pw2gw1, pw1){
+  jpd.w1.w2 &lt;- pw2gw1*pw1  #Joint probability distribution computed using the chain rule.
+  
+  perplexityBi &lt;- ( (1/jpd.w1.w2) )^(1/2)
+  
+  return(perplexityBi)
+}
+
+computePerplexityTrigram &lt;- function(pw3gw1w2, pw2gw1, pw1){
+  jpd.w1.w2.w3 &lt;- pw3gw1w2*pw2gw1*pw1  #Joint probability distribution computed using the chain rule.
+  
+  perplexityTri &lt;- ( (1/jpd.w1.w2.w3) )^(1/3)
+  
+  return(perplexityTri)
+}
+
+computePerplexityTetragram &lt;- function(pw4gw1w2w3, pw3gw1w2, pw2gw1, pw1){
+  jpd.w1.w2.w3.w4 &lt;- pw4gw1w2w3*pw3gw1w2*pw2gw1*pw1  #Joint probability distribution computed using the chain rule.
+  
+  perplexityTetra &lt;- ( (1/jpd.w1.w2.w3.w4) )^(1/4)
+  
+  return(perplexityTetra)
+}</code></pre>
+<p>Details regarding the experiments are contained in the script <code>experiments.R</code> in the repository. This is a screenshot of the general approach:</p>
+<pre><code>experimentAccuracy &lt;- function(sampleSizePercentage, flagA, flagB){
+  suppressMessages(source(&quot;nGramPredictionV1.R&quot;))
+  suppressMessages(source(&quot;readData.R&quot;))
+  options(warn=-1)
+  
+  results.bigrams.df &lt;- data.frame(Test.Case = character(), 
+                                   size = integer(), 
+                                   predictor = character(), 
+                                   true.value = character(), 
+                                   prediction = character(),
+                                   result = numeric())
+  
+  results.trigrams.df &lt;- data.frame(Test.Case = character(), size = integer() )
+  results.tetragrams.df &lt;- data.frame(Test.Case = character(), size = integer() )
+  
+  #Load test cases
+  load(&quot;./data/ngrams.df.testcases.1e-04.Rdata&quot;,  verbose = TRUE)
+  
+  #Load trainned Model Parameters
+  load(paste0(&quot;./data/ngrams.df.p.&quot;, sampleSizePercentage, &quot;.Rdata&quot;),  verbose = TRUE)
+  
+  for(ng in 2:4){
+   if(ng == 2){
+     for(i in 1:nrow(test.bigrams.df)){
+       #Construct test case.
+       testCase &lt;- paste(test.bigrams.df$word1[i], test.bigrams.df$word2[i])
+       predictorWord &lt;- test.bigrams.df$word1[i]
+       trueWord &lt;- test.bigrams.df$word2[i]
+       print(paste(&quot;TEST CASE: &quot;, i, test.bigrams.df$Words[i]))
+       #print(testCase)
+       #print(predictorWord)
+       #print(trueWord)
+       predictedWords &lt;- nGramPredictionV2(predictorWord, flagA, flagB, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+       #print(paste(&quot;Predicted Word:&quot;, predictedWords, length(predictedWords)))
+       predictedStringList &lt;- paste(predictedWords, collapse = &quot;, &quot;)
+       
+       if( trueWord %in% predictedWords ){ resulted &lt;- 1 } else { resulted &lt;- 0}
+       df &lt;- data.frame(Test.Case = testCase, 
+                        size = 2, 
+                        predictor = predictorWord, 
+                        true.value = trueWord, 
+                        prediction = predictedStringList,
+                        result = resulted)
+       
+       #Store test case result.  
+       results.bigrams.df &lt;- rbind(results.bigrams.df, df) 
+       
+     }
+   }
+   else if(ng == 3){
+     for(i in 1:nrow(test.trigrams.df)){
+       #Construct test case.
+       testCase &lt;- paste(test.trigrams.df$word1[i], test.trigrams.df$word2[i], test.trigrams.df$word3[i])
+       predictorWord &lt;- paste(test.trigrams.df$word1[i], test.trigrams.df$word2[i])
+       trueWord &lt;- test.trigrams.df$word3[i]
+       print(paste(&quot;TEST CASE: &quot;, i, test.trigrams.df$Words[i]))
+       #print(testCase)
+       #print(predictorWord)
+       #print(trueWord)
+       predictedWords &lt;- nGramPredictionV2(predictorWord, flagA, flagB, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+       #print(paste(&quot;Predicted Word:&quot;, predictedWords, length(predictedWords)))
+       predictedStringList &lt;- paste(predictedWords, collapse = &quot;, &quot;)
+       
+       if( trueWord %in% predictedWords ){ resulted &lt;- 1 } else { resulted &lt;- 0}
+       df &lt;- data.frame(Test.Case = testCase, 
+                        size = 3, 
+                        predictor = predictorWord, 
+                        true.value = trueWord, 
+                        prediction = predictedStringList,
+                        result = resulted)
+       
+       #Store test case result.  
+       results.trigrams.df &lt;- rbind(results.trigrams.df, df)
+     }
+   }
+   else if(ng == 4){
+     for(i in 1:nrow(test.tetragrams.df)){
+       #Construct test case.
+       testCase &lt;- paste(test.tetragrams.df$word1[i], test.tetragrams.df$word2[i], test.tetragrams.df$word3[i], test.tetragrams.df$word4[i])
+       predictorWord &lt;- paste(test.tetragrams.df$word1[i], test.tetragrams.df$word2[i], test.tetragrams.df$word3[i])
+       trueWord &lt;- test.tetragrams.df$word4[i]
+       print(paste(&quot;TEST CASE: &quot;, i, test.tetragrams.df$Words[i]))
+       #print(testCase)
+       #print(predictorWord)
+       #print(trueWord)
+       predictedWords &lt;- nGramPredictionV2(predictorWord, flagA, flagB, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+       #print(paste(&quot;Predicted Word:&quot;, predictedWords, length(predictedWords)))
+       predictedStringList &lt;- paste(predictedWords, collapse = &quot;, &quot;)
+       
+       if( trueWord %in% predictedWords ){ resulted &lt;- 1 } else { resulted &lt;- 0}
+       df &lt;- data.frame(Test.Case = testCase, 
+                        size = 4, 
+                        predictor = predictorWord, 
+                        true.value = trueWord, 
+                        prediction = predictedStringList,
+                        result = resulted)
+       
+       #Store test case result.  
+       results.tetragrams.df &lt;- rbind(results.tetragrams.df, df)
+     }
+   }
+    
+   
+    
+  }
+}
+
+nGramPredictionV2 &lt;- function(inputNGram, flagA, flagB, unigrams.df, bigrams.df, trigrams.df, tetragrams.df){
+  suppressMessages(library(quanteda))
+  options(warn=-1)
+  set.seed(13)
+  
+  #@@@ inside prediction Vector indicates an empty prediction slot.
+  predictionVector &lt;- c(&quot;@@@&quot;,&quot;@@@&quot;,&quot;@@@&quot;)
+  
+  inputNGram.df &lt;- cleanInputNGram(inputNGram)
+  print(&quot;Input n-gram:&quot;)
+  print(inputNGram.df)
+  print(&quot;&quot;)
+  
+  #A. Predict words based upon the observed n-grams in the data.
+  if(flagA){
+    predictionVector &lt;- predictAssumingObservedNGram(inputNGram.df, unigrams.df, bigrams.df, trigrams.df, tetragrams.df)
+  }
+  #B. Predict words that were not observed in the n-grams in the data.
+  #We use the Historical Track (HT) algorithm described in section Task 4 in the Journal Readme.md, Readme.html in the repository.
+  if(flagB){
+    predictionVector &lt;- c(predictionVector, predictAssumingUnobservedNGram(inputNGram.df, unigrams.df, bigrams.df, trigrams.df, tetragrams.df))
+  }
+  #Remove blanks and set the final vector to be proposed for prediction.
+  #The three first slots corresponds to predictions from observed n-grams in Corpus, the remaining 3 proceed from the HT algorithm
+  #for unobserved n-grams and or lexems.
+  finalPredictionVector &lt;- c()
+  for(i in 1:length(predictionVector)){
+    if(predictionVector[i] != &quot;@@@&quot;){
+      finalPredictionVector &lt;- c(finalPredictionVector, predictionVector[i])      
+      if(length(finalPredictionVector) == 3){
+        break
+      }
+    }
+    
+  }
+
+  return(finalPredictionVector)
+}</code></pre>
+</div>
+</div>
+<div id="natural-language-processing-ii-check" class="section level2">
+<h2>Natural language processing II Check</h2>
+<ol style="list-style-type: decimal">
+<li>When you breathe, I want to be the air for you. I’ll be there for you, I’d live and I’d</li>
+</ol>
+<p><strong>die</strong></p>
+<ol start="2" style="list-style-type: decimal">
+<li>Guy at my table’s wife got up to go to the bathroom and I asked about dessert and he started telling me about his</li>
+</ol>
+<p><strong>marital</strong></p>
+<ol start="3" style="list-style-type: decimal">
+<li>I’d give anything to see arctic monkeys this</li>
+</ol>
+<p><strong>weekend</strong></p>
+<ol start="4" style="list-style-type: decimal">
+<li>Talking to your mom has the same effect as a hug and helps reduce your</li>
+</ol>
+<p><strong>stress</strong></p>
+<ol start="5" style="list-style-type: decimal">
+<li>When you were in Holland you were like 1 inch away from me but you hadn’t time to take a</li>
+</ol>
+<p><strong>picture</strong></p>
+<ol start="6" style="list-style-type: decimal">
+<li>I’d just like all of these questions answered, a presentation of evidence, and a jury to settle the</li>
+</ol>
+<p><strong>matter</strong></p>
+<ol start="7" style="list-style-type: decimal">
+<li>I can’t deal with unsymetrical things. I can’t even hold an uneven number of bags of groceries in each</li>
+</ol>
+<p><strong>hand</strong></p>
+<ol start="8" style="list-style-type: decimal">
+<li>Every inch of you is perfect from the bottom to the</li>
+</ol>
+<p><strong>top</strong></p>
+<ol start="9" style="list-style-type: decimal">
+<li>I’m thankful my childhood was filled with imagination and bruises from playing</li>
+</ol>
+<p><strong>outside</strong></p>
+<ol start="10" style="list-style-type: decimal">
+<li>I like how the same people are in almost all of Adam Sandler’s</li>
+</ol>
+<p><strong>just</strong></p>
+</div>
+<div id="task-6---data-product" class="section level2">
+<h2>Task 6 - Data Product</h2>
+<p>The goal of this exercise is to create a product to highlight the prediction algorithm that you have built and to provide an interface that can be accessed by others via a Shiny app..</p>
+<p>Tasks to accomplish</p>
+<p>Create a data product to show off your prediction algorithm You should create a Shiny app that accepts an n-gram and predicts the next word.</p>
+<p>Questions to consider</p>
+<p>What are the most interesting ways you could show off your algorithm?</p>
+<p>Are there any data visualizations you think might be helpful (look at the Swiftkey data dashboard if you have it loaded on your phone)?</p>
+<p>How should you document the use of your data product (separately from how you created it) so that others can rapidly deploy your algorithm?</p>
+<p>Tips, tricks, and hints</p>
+<p>Consider the size of the predictive model you have developed. You may have to sacrifice some accuracy to have a fast enough/small enough model to load into Shiny.</p>
+<p><strong>Please refer to the shiny App folder in the repository for more details.</strong></p>
+</div>
+<div id="task-7---slide-deck" class="section level2">
+<h2>Task 7 - Slide Deck</h2>
+<p>The goal of this exercise is to “pitch” your data product to your boss or an investor. The slide deck is constrained to be 5 slides or less and should: (1) explain how your model works, (2) describe its predictive performance quantitatively and (3) show off the app and how it works.</p>
+<p>Tasks to accomplish</p>
+<p>Create a slide deck promoting your product. Write 5 slides using RStudio Presenter explaining your product and why it is awesome!</p>
+<p>Questions to consider</p>
+<p>How can you briefly explain how your predictive model works?</p>
+<p>How can you succinctly quantitatively summarize the performance of your prediction algorithm?</p>
+<p>How can you show the user how the product works?</p>
+<p>Tips, tricks, and hints</p>
+<p>The Rstudio presentation information is available here (<a href="https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations" class="uri">https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations</a>).</p>
+<p><strong>Please refer to the .Rmd and .html files for the presentation slides in the repository.</strong></p>
 </div>
 </div>
 
