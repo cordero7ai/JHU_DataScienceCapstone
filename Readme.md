@@ -1624,4 +1624,4 @@ Tips, tricks, and hints
 
 The Rstudio presentation information is available here (https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations).
 
-**Please refer to the .Rmd and .html files for the presentation slides in the repository.**
+**Please refer to the index.Rmd and index.html files for the presentation slides in the repository.**
