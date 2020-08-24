@@ -9,7 +9,7 @@ This repository contains all code and products that are necessary to build a pre
 
 **The final presentation slides can be found at: []().**
 
-Please refer to all R scripts in the webpage [https://github.com/corderoai/JHU_DataScienceCapstone](https://github.com/corderoai/JHU_DataScienceCapstone).
+**Github Repository: Please refer to all R scripts in the webpage [https://github.com/corderoai/JHU_DataScienceCapstone](https://github.com/corderoai/JHU_DataScienceCapstone).**
 
 The Milestone Report is available at:
 [https://rpubs.com/jcoml/648976](https://rpubs.com/jcoml/648976)

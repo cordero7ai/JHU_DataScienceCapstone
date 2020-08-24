@@ -571,3 +571,15 @@ computePerplexityTetragram <- function(pw4gw1w2w3, pw3gw1w2, pw2gw1, pw1){
   
   return(perplexityTetra)
 }
+
+accuracyTable <- data.frame( Sample.Size = c(".1%",".1%",".1%",".5%",".5%",".5%","1%","1%","1%","3%","3%","3%"),
+                             n.gram = c("bigrams", "trigrams", "tetragrams","bigrams", "trigrams", "tetragrams","bigrams", "trigrams", "tetragrams","bigrams", "trigrams", "tetragrams"),
+                             Accuracy.Percentage.EMS = c(25.64, 26.16, 24.72, 44.84, 44.28, 41.60, 55.87, 55.01, 54.93, 60.28, 61.99, 	60.28),
+                             Accuracy.Percentage.HT = c(13.32, 24.36, 24.32, 13.31, 16.32, 38.52, 14.88, 7.22, 4.92, 9.36, 3.57, 3.82),
+                             Accuracy.Percentage.EMS.HT = c(28.44, 26.52, 25.08, 47.16, 46.08, 42.61, 	60.12, 72.60, 71.64, 72.12, 81.36, 80.04)
+)
+
+perplexityTable <- data.frame( Sample.Size = c(".1%",".5%","1%","3%",".1%",".5%","1%","3%",".1%",".5%","1%","3%"),
+                               n.gram = c("bigrams","bigrams","bigrams","bigrams","trigrams","trigrams","trigrams","trigrams","tetragrams","tetragrams","tetragrams","tetragrams"),   
+                               Accuracy = c(	28.44, 47.16, 	60.12, 72.12, 26.52, 46.08, 72.60, 81.36, 25.08, 42.61, 71.64, 80.04),
+                               mean.Perplexity = c( "19,407.643", "10,926.306", "8,829.629", "7,053.359", "22,929.987", "15,065.242", "	13,094.427", "11,244.204", "27,110.892", "19,839.251", "17,637.174", "	15,753.426"))
