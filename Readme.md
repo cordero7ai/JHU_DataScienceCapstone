@@ -7,7 +7,7 @@ This repository contains all code and products that are necessary to build a pre
 
 **The shiny app is located at: [https://cordero.shinyapps.io/DSCAPSTONEAPP/](https://cordero.shinyapps.io/DSCAPSTONEAPP/).**
 
-**The final presentation slides can be found at: []().**
+**The final presentation slides can be found at: [https://cordero7ai.github.io/JHU_DataScienceCapstone/](https://cordero7ai.github.io/JHU_DataScienceCapstone/).**
 
 Please refer to all R scripts in the webpage [https://github.com/corderoai/JHU_DataScienceCapstone](https://github.com/corderoai/JHU_DataScienceCapstone).
 
